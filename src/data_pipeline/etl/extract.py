@@ -4,7 +4,7 @@ from typing import Generator
 from pyspark.sql import SparkSession, DataFrame
 
 
-def from_file(path, fraction=1) -> DataFrame:
+def from_jsonl_gz_file(path, fraction=1.0) -> DataFrame:
     """Returns a Spark DataFrame from the JSON objects in the gzip file.
 
     Args:
@@ -23,7 +23,7 @@ def from_file(path, fraction=1) -> DataFrame:
 
     # Load JSON data
     df = spark.read.json(path)
-    return df.sample(fraction)
+    return df.sample(fraction=fraction)
 
 
 def _parse_from_file(path: str) -> Generator:

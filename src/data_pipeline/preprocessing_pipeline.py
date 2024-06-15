@@ -1,6 +1,7 @@
 from pyspark.sql import DataFrame
 from transformers import BertTokenizer
-from src.data_pipeline import clean, transform, utils
+from src.data_pipeline.etl import extract, clean, transform
+from src.data_pipeline import utils
 
 logger = utils.get_logger(__name__)
 
@@ -27,7 +28,7 @@ class PreprocessingPipeline:
         """
         self.tokenizer = BertTokenizer.from_pretrained(bert_model_name)
         self.ordered_columns_to_keep = [
-            "title", "description", "feature", "brand", "asin"]
+            "title", "description", "feature", "brand", "asin", "main_cat"]
 
     def _clean_data(self, df: DataFrame) -> DataFrame:
         """
@@ -70,3 +71,4 @@ class PreprocessingPipeline:
         processed_df = self._process_text(cleaned_df)
         logger.info("Preprocessing pipeline completed.")
         return processed_df
+

@@ -1,0 +1,9 @@
+# data files
+data/*
+
+
+# vscode files
+launch.json
+
+./__pycache__
+*.pyc

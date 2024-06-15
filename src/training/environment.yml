@@ -1,0 +1,11 @@
+name: training
+channels:
+  - defaults
+  - conda-forge
+dependencies:
+  - fire=0.6.0
+  - pandas=2.2.2
+  - python=3.10.14
+  - python-dateutil=2.9.0post0
+  - python-tzdata=2023.3
+

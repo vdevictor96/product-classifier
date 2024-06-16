@@ -1,6 +1,7 @@
 from pyspark.sql import DataFrame
-from transformers import BertTokenizer
-from src.data_pipeline.etl import extract, clean, transform
+from transformers import AutoTokenizer
+
+from src.data_pipeline.etl import clean, transform
 from src.data_pipeline import utils
 
 logger = utils.get_logger(__name__)
@@ -26,7 +27,7 @@ class PreprocessingPipeline:
         Args:
             bert_model_name (str): Name of the BERT model to use for tokenization.
         """
-        self.tokenizer = BertTokenizer.from_pretrained(bert_model_name)
+        self.tokenizer = AutoTokenizer.from_pretrained(bert_model_name)
         self.ordered_columns_to_keep = [
             "title", "description", "feature", "brand", "asin", "main_cat"]
 
@@ -53,7 +54,11 @@ class PreprocessingPipeline:
             DataFrame: DataFrame with tokenized text column.
         """
         df = transform.combine_text_fields(df)
-        return transform.bert_tokenize_text(df, self.tokenizer)
+        df.show(2, truncate=False)
+        df = transform.bert_tokenize_text(df, self.tokenizer)
+        # Drop the original columns
+        columns_to_keep = ["input_ids", "attention_mask", "main_cat"]
+        return df.select(*columns_to_keep)
 
     def preprocess(self, df: DataFrame) -> DataFrame:
         """

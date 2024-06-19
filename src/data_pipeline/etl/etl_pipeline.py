@@ -1,3 +1,4 @@
+"""Module that performs the ETL pipeline (Extract, Transform, Load)."""
 import fire
 from src.data_pipeline.etl.extract import from_jsonl_gz_file
 from src.data_pipeline.etl.load import to_parquet_file

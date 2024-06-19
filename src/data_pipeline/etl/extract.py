@@ -1,3 +1,4 @@
+"""Module that takes care of the extraction of the raw data in an ETL pipeline."""
 import gzip
 import json
 from typing import Generator

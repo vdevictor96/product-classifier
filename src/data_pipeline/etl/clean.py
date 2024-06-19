@@ -1,3 +1,4 @@
+"""Module that takes care of the cleaning of the raw data in an ETL pipeline."""
 from pyspark.sql import DataFrame
 
 

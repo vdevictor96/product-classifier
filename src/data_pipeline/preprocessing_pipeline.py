@@ -1,3 +1,4 @@
+"""Module for preprocessing the product data for BERT-based NLP tasks."""
 from pyspark.sql import DataFrame
 from transformers import AutoTokenizer
 
@@ -73,7 +74,7 @@ class PreprocessingPipeline:
         logger.info("Cleaning the data.")
         cleaned_df = self._clean_data(df)
         logger.info("Processing the text data.")
-        processed_df = self._process_text(cleaned_df)
+        preprocessed_df = self._process_text(cleaned_df)
         logger.info("Preprocessing pipeline completed.")
-        return processed_df
+        return preprocessed_df
 

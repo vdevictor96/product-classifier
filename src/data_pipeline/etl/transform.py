@@ -3,6 +3,9 @@
 from pyspark.sql import DataFrame
 
 from src.data_pipeline.preprocessing_pipeline import PreprocessingPipeline
+from src.data_pipeline import utils
+
+logger = utils.get_logger(__name__)
 
 
 def preprocess(df: DataFrame) -> DataFrame:
@@ -15,5 +18,9 @@ def preprocess(df: DataFrame) -> DataFrame:
     Returns:
         DataFrame: DataFrame with preprocessed data.
     """
-    preprocessing_pipeline = PreprocessingPipeline()
-    return preprocessing_pipeline.preprocess(df)
+    try:
+        preprocessing_pipeline = PreprocessingPipeline()
+        return preprocessing_pipeline.preprocess(df)
+    except Exception as e:
+        logger.error("Failed to preprocess data: %s", e, exc_info=True)
+        raise

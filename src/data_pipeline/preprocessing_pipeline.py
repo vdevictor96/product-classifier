@@ -36,14 +36,18 @@ class PreprocessingPipeline:
         Returns:
             DataFrame: Cleaned DataFrame.
         """
-        # Ensure "ordered_columns_to_keep" is a subset of the actual DataFrame columns
-        if ordered_columns_to_keep is not None:
-            actual_columns = df.columns
-            ordered_columns_to_keep = [
-                col for col in ordered_columns_to_keep if col in actual_columns]
-            df = df.select(*ordered_columns_to_keep)
+        try:
+            # Ensure "ordered_columns_to_keep" is a subset of the actual DataFrame columns
+            if ordered_columns_to_keep is not None:
+                actual_columns = df.columns
+                ordered_columns_to_keep = [
+                    col for col in ordered_columns_to_keep if col in actual_columns]
+                df = df.select(*ordered_columns_to_keep)
 
-        return df
+            return df
+        except Exception as e:
+            logger.error("Failed to clean data: %s", e, exc_info=True)
+            raise
 
     def _process_text(self, df: DataFrame, combined_text_column="combined_text") -> DataFrame:
         """
@@ -55,10 +59,14 @@ class PreprocessingPipeline:
         Returns:
             DataFrame: DataFrame with tokenized text column.
         """
-        df = self._combine_text_fields(df, combined_text_column)
-        # Drop the original columns
-        columns_to_keep = [combined_text_column, "main_cat"]
-        return df.select(*columns_to_keep)
+        try:
+            df = self._combine_text_fields(df, combined_text_column)
+            # Drop the original columns
+            columns_to_keep = [combined_text_column, "main_cat"]
+            return df.select(*columns_to_keep)
+        except Exception as e:
+            logger.error("Failed to process text: %s", e, exc_info=True)
+            raise
 
     def _combine_text_fields(self, df: DataFrame, combined_text_column="combined_text") -> DataFrame:
         """
@@ -92,10 +100,15 @@ class PreprocessingPipeline:
         Returns:
             DataFrame: Preprocessed dataframe ready for training or inference.
         """
-        logger.info("Cleaning the data.")
-        cleaned_df = self._clean_data(df, self.ordered_columns_to_keep)
-        logger.info("Processing the text data.")
-        preprocessed_df = self._process_text(
-            cleaned_df, self.combined_text_column)
-        logger.info("Preprocessing pipeline completed.")
-        return preprocessed_df
+        try:
+            logger.info("Starting preprocessing pipeline.")
+            logger.info("Cleaning the data.")
+            cleaned_df = self._clean_data(df, self.ordered_columns_to_keep)
+            logger.info("Processing the text data.")
+            preprocessed_df = self._process_text(
+                cleaned_df, self.combined_text_column)
+            logger.info("Preprocessing pipeline completed.")
+            return preprocessed_df
+        except Exception as e:
+            logger.error("Preprocessing pipeline failed: %s", e, exc_info=True)
+            raise

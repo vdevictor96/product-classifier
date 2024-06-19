@@ -1,3 +1,4 @@
+"""Module that loads the proprocessed data back to a safe storage. Last step in ETL pipeline."""
 from pyspark.sql import DataFrame
 
 

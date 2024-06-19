@@ -1,3 +1,5 @@
+"""Module that takes care of preprocessing the raw data in an ETL pipeline."""
+
 from pyspark.sql import DataFrame
 from pyspark.sql.functions import col, udf
 from pyspark.sql.types import StringType, ArrayType, IntegerType

@@ -1,3 +1,4 @@
+"""Module that defines the PyTorch IterableDataset for the product data."""
 from typing import Iterator
 
 from torch import Tensor, tensor
@@ -45,9 +46,24 @@ class ProductDataset(IterableDataset):
         attention_mask = tensor(row['attention_mask'])
         return input_ids, attention_mask, tensor(label)
 
+    def __len__(self):
+        return self.df.count()
+
+    # def __iter__(self) -> Iterator[tuple[Tensor, Tensor, Tensor]]:
+    #     """
+    #     Iterator that yields batches of data using DataFrame operations.
+    #     Note: This version is faster but requires more memory.
+
+    #     Yields:
+    #         A batch of data as a tuple of input_ids, attention_mask, and labels.
+    #     """
+    #     pandas_df = self.df.toPandas()
+    #     return (self.process_row(row) for index, row in pandas_df.iterrows())
+    
     def __iter__(self) -> Iterator[tuple[Tensor, Tensor, Tensor]]:
         """
         Iterator that yields batches of data.
+        Note: This version is slower but requires less memory.
 
         Yields:
             A batch of data as a tuple of input_ids, attention_mask, and labels.

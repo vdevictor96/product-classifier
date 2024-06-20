@@ -88,7 +88,7 @@ def plot_confusion_matrix(cm: np.ndarray, labels: list[str], log: bool = True):
 
     Args:
         cm (np.ndarray): Confusion matrix.
-        labels (list(str)): List of class labels.
+        labels (list[str]): List of class labels.
         log (bool): Whether to log the plot to MLflow. Defaults to True.
     """
     try:

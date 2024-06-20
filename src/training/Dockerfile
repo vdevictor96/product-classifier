@@ -15,6 +15,11 @@ COPY src/training/environment.yml /usr/app/src/training/
 # Install dependencies from conda environment file
 RUN conda env create -f environment.yml --name training
 
+# Create Databricks authentication file
+RUN echo "[DEFAULT]" > ~/.databrickscfg && \
+    echo "host = https://community.cloud.databricks.com/" >> ~/.databrickscfg && \
+    echo "username = correovmp@gmail.com" >> ~/.databrickscfg && \
+    echo "password = ${DATABRICKS_PASSWORD}" >> ~/.databrickscfg
 
 # Make RUN commands use the conda environment:
 SHELL ["conda", "run", "-n", "training", "/bin/bash", "-c"]
@@ -32,17 +37,9 @@ ARG DATABRICKS_PASSWORD
 ENV NVIDIA_VISIBLE_DEVICES=all
 ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
 
-# Create Databricks authentication file
-RUN echo "[DEFAULT]" > ~/.databrickscfg && \
-    echo "host = https://community.cloud.databricks.com/" >> ~/.databrickscfg && \
-    echo "username = correovmp@gmail.com" >> ~/.databrickscfg && \
-    echo "password = ${DATABRICKS_PASSWORD}" >> ~/.databrickscfg
 
 WORKDIR /usr/app/
 
-
-# Create Databricks authentication file and run training pipeline on conda environment
-# ENTRYPOINT ["/usr/app/src/training/entrypoint.sh"]
 
 ENTRYPOINT ["conda", "run", "--no-capture-output", "-n", "training", "python", "-m", "src.training.training_pipeline"]
 

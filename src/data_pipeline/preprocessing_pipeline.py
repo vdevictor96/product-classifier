@@ -1,10 +1,10 @@
 """Module for preprocessing the product data for BERT-based NLP tasks."""
+import pickle
 from pyspark.sql import DataFrame
 from pyspark.sql.functions import col, udf
 from pyspark.sql.types import StringType
 import mlflow
 import fire
-import pickle
 from src.data_pipeline import utils
 
 logger = utils.get_logger(__name__)

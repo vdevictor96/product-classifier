@@ -3,12 +3,12 @@ import os
 from dotenv import load_dotenv
 
 
-def load_env_vars() -> dict(str):
+def load_env_vars() -> dict[str]:
     """
     Load environment variables from .env file.
     
     Returns:
-        dict(str): Environment variables.
+        dict[str]: Environment variables.
 
     """
     load_dotenv("src/inference/.env")

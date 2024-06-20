@@ -3,9 +3,13 @@ from typing import Iterator
 
 from torch import Tensor, tensor
 from torch.utils.data import IterableDataset
-from transformers import BertTokenizer
+from transformers import AutoTokenizer
+
 from pyspark.sql import DataFrame
 from sklearn.preprocessing import LabelEncoder
+from src.training import utils
+
+logger = utils.get_logger(__name__)
 
 
 class ProductDataset(IterableDataset):
@@ -15,20 +19,23 @@ class ProductDataset(IterableDataset):
     Attributes:
         df (DataFrame): The Spark DataFrame containing the data.
         label_encoder (LabelEncoder): An encoder for converting category labels to integers.
-        max_length (int): Maximum length of the tokens.
+        tokenizer (BertTokenizer): The BERT tokenizer to use.
+        max_length (int): Maximum length of the input sequence for BERT Tokenizer. Defaults to 512.
     """
 
-    def __init__(self, df: DataFrame, label_encoder: LabelEncoder, max_length=512):
+    def __init__(self, df: DataFrame, label_encoder: LabelEncoder, tokenizer: AutoTokenizer, max_length=512):
         """
         Initializes the dataset with a Spark DataFrame, a label encoder, and a tokenizer.
 
         Args:
             df (DataFrame): The Spark DataFrame to load data from.
             label_encoder (LabelEncoder): The encoder for converting category labels to integers.
-            max_length (int): The maximum length of the tokenized input.
+            tokenizer (BertTokenizer): The BERT tokenizer to use.
+            max_length (int): Maximum length of the input sequence for BERT Tokenizer. Defaults to 512.
         """
         self.df = df
         self.label_encoder = label_encoder
+        self.tokenizer = tokenizer
         self.max_length = max_length
 
     def process_row(self, row) -> tuple[Tensor, Tensor, Tensor]:
@@ -41,10 +48,23 @@ class ProductDataset(IterableDataset):
         Returns:
             tuple containing input_ids, attention_mask, and label as tensors.
         """
-        label = self.label_encoder.transform([row['main_cat']])[0]
-        input_ids = tensor(row['input_ids'])
-        attention_mask = tensor(row['attention_mask'])
-        return input_ids, attention_mask, tensor(label)
+        try:
+            label = self.label_encoder.transform([row['main_cat']])[0]
+            encoded = self.tokenizer.encode_plus(
+                text=row['combined_text'],
+                add_special_tokens=True,
+                max_length=self.max_length,
+                return_attention_mask=True,
+                padding='max_length',
+                truncation=True,
+                return_tensors='pt'
+            )
+            input_ids = encoded['input_ids'].squeeze(0)
+            attention_mask = encoded['attention_mask'].squeeze(0)
+            return input_ids, attention_mask, tensor(label)
+        except Exception as e:
+            logger.error("Failed to process row: %s", e, exc_info=True)
+            raise
 
     def __len__(self):
         return self.df.count()
@@ -59,7 +79,7 @@ class ProductDataset(IterableDataset):
     #     """
     #     pandas_df = self.df.toPandas()
     #     return (self.process_row(row) for index, row in pandas_df.iterrows())
-    
+
     def __iter__(self) -> Iterator[tuple[Tensor, Tensor, Tensor]]:
         """
         Iterator that yields batches of data.

@@ -37,7 +37,7 @@ def run(input_path: str, output_path: str, data_fraction=1.0, seed=42):
         logger.info("ETL pipeline completed.")
     except Exception as e:
         logger.error("ETL pipeline failed: %s", e, exc_info=True)
-        raise e
+        raise
 
 
 if __name__ == "__main__":

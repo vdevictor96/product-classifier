@@ -1,0 +1,10 @@
+input_data_path: 'data/preprocessed/amz_products_small_preprocessed_v1.parquet'
+bert_model_name: 'bert-base-uncased'
+num_epochs: 3
+batch_size: 8
+test_batch_size: 32
+learning_rate: 1e-5
+optimizer: 'AdamW'
+device: 'cuda'
+seed: 42
+data_fraction: 1.0

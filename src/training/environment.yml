@@ -12,6 +12,7 @@ dependencies:
   - pyspark=3.4.1
   - python=3.10.14
   - python-dateutil=2.9.0post0
+  - python-dotenv=0.21.0
   - python-tzdata=2023.3
   - python-xxhash=2.0.2
   - pytorch::pytorch=2.3.1

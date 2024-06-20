@@ -16,6 +16,7 @@ from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics import f1_score, precision_score, recall_score, accuracy_score, confusion_matrix
 from src.training.constants import CATEGORIES
 from src.training import utils
+from src.training.settings import SETTINGS
 from src.training.datasets.product_dataset import ProductDataset
 
 
@@ -301,10 +302,10 @@ def run(config='src/training/configs/default_config.yml', **overrides):
     try:
         logger.info("Logging in to MLflow server hosted at Databricks CE.")
         mlflow.login()
-        mlflow.set_tracking_uri("databricks")
+        mlflow.set_tracking_uri(SETTINGS["MLFLOW_TRACKING_URI"])
 
         logger.info("Setting up MLflow experiment.")
-        mlflow.set_experiment("/fever-code-challenge")
+        mlflow.set_experiment(SETTINGS["MLFLOW_EXPERIMENT_NAME"])
 
         logger.info("Starting training pipeline with configuration:")
         config = utils.load_config(config)

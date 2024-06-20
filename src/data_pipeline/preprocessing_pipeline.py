@@ -2,6 +2,9 @@
 from pyspark.sql import DataFrame
 from pyspark.sql.functions import col, udf
 from pyspark.sql.types import StringType
+import mlflow
+import fire
+import pickle
 from src.data_pipeline import utils
 
 logger = utils.get_logger(__name__)
@@ -112,3 +115,23 @@ class PreprocessingPipeline:
         except Exception as e:
             logger.error("Preprocessing pipeline failed: %s", e, exc_info=True)
             raise
+
+
+def run():
+    """
+    Runs the preprocessing pipeline and loads it to MLflow as an artifact to be used in the inference pipeline.
+    """
+    pipeline = PreprocessingPipeline()
+
+    with mlflow.start_run():
+        # Serialize the preprocessing pipeline
+        with open("preprocessing_pipeline.pkl", "wb") as f:
+            pickle.dump(pipeline, f)
+        
+        # Log the serialized object as an artifact
+        mlflow.log_artifact("preprocessing_pipeline.pkl", artifact_path="preprocessing_pipeline")
+
+
+
+if __name__ == "__main__":
+    fire.Fire(run)

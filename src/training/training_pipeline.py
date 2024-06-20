@@ -411,7 +411,7 @@ def run(config='src/training/configs/default_config.yml', **overrides):
                         best_model_state = model.state_dict()
                         logger.info(
                             "New best model saved in epoch %d with validation loss: %.4f and accuracy: %.2f%%",
-                            epoch+1, val_loss, eval_acc * 100)
+                            epoch+1, eval_loss, eval_acc * 100)
 
                 # Load the best model before testing
                 model.load_state_dict(best_model_state)

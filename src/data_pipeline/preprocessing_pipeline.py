@@ -85,7 +85,7 @@ class PreprocessingPipeline:
 
         # Define a UDF to combine all columns into a single string
         combine_udf = udf(
-            lambda *cols: " ".join([str(col) for col in cols if col is not None]), StringType())
+            lambda *cols: ". ".join([str(col) for col in cols if col is not None]), StringType())
 
         # Get all column names from the DataFrame except the label column "main_cat"
         column_names = [c for c in df.columns if c != "main_cat"]

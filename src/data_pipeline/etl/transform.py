@@ -2,7 +2,7 @@
 
 from pyspark.sql import DataFrame
 
-from src.data_pipeline.preprocessing_pipeline import PreprocessingPipeline
+from src.data_pipeline.etl.preprocessing_pipeline import PreprocessingPipeline
 from src.data_pipeline import utils
 
 logger = utils.get_logger(__name__)

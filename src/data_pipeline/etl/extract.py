@@ -24,8 +24,8 @@ def from_jsonl_gz_file(path, data_fraction=1.0, seed=42) -> DataFrame:
         spark = SparkSession.builder \
             .appName("ProductClassifier") \
             .master("local[*]") \
-            .config("spark.driver.memory", "4g") \
-            .config("spark.executor.memory", "4g") \
+            .config("spark.driver.memory", "6g") \
+            .config("spark.executor.memory", "6g") \
             .getOrCreate()
 
         # Load JSON data

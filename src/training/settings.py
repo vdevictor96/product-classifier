@@ -11,7 +11,7 @@ def load_env_vars() -> dict[str]:
         dict[str]: Environment variables.
 
     """
-    load_dotenv("src/inference/.env")
+    load_dotenv("src/training/.env")
     return dict(os.environ)
 
 SETTINGS = load_env_vars()

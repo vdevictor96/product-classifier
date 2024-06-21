@@ -1,6 +1,6 @@
-input_data_path: 'data/preprocessed/amz_products_small_preprocessed_v1.parquet'
-input_data_encoded: False
-data_load: 'static'
+input_data_path: 'data/preprocessed/amz_products_small_bert_tiny_encoded_v2.parquet'
+input_data_encoded: True
+data_load: 'distributed'
 trainable_layers: None
 bert_model_name: "prajjwal1/bert-tiny"
 num_epochs: 1
@@ -10,4 +10,4 @@ learning_rate: 1e-5
 optimizer: "AdamW"
 device: "cuda"
 seed: 42
-data_fraction: 0.001
+data_fraction: 0.03

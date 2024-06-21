@@ -30,6 +30,6 @@ def preprocess_data(data: ProductDescription) -> str:
     Returns:
         str: The preprocessed text data.
     """
-    combined_text = ". ".join(
+    combined_text = "| ".join(
         [data.title] + data.description + data.feature + [data.brand])
     return combined_text

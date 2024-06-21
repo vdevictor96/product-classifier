@@ -25,7 +25,7 @@ class PreprocessingPipeline:
 
         """
         self.ordered_columns_to_keep = [
-            "title", "description", "feature", "brand", "main_cat"]
+            "asin", "title", "description", "feature", "brand", "main_cat"]
         self.combined_text_column = "combined_text"
 
     def _clean_data(self, df: DataFrame, ordered_columns_to_keep=None) -> DataFrame:
@@ -85,7 +85,7 @@ class PreprocessingPipeline:
 
         # Define a UDF to combine all columns into a single string
         combine_udf = udf(
-            lambda *cols: ". ".join([str(col) for col in cols if col is not None]), StringType())
+            lambda *cols: "| ".join([str(col) for col in cols if col is not None]), StringType())
 
         # Get all column names from the DataFrame except the label column "main_cat"
         column_names = [c for c in df.columns if c != "main_cat"]

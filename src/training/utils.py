@@ -138,6 +138,47 @@ def load_config(config_path: str) -> dict:
 
 
 
+def freeze_layers(model, layers_count):
+    """
+    Freezes all layers except the last layers_count layers.
+    
+    Args:
+        model: PyTorch model.
+        layers_count: Number of layers to keep trainable.
+    
+    Returns:
+        int: The number of trainable parameters.
+        list: List of layers that are trainable.
+    """
+    layers = []
+    # Retrieve the last layers keys
+    if hasattr(model, 'classifier'):
+        layers.append(('classifier', model.classifier))
+        layers_count -= 1
+    if layers_count > 0 and hasattr(model.bert, 'pooler'):
+        layers.append(('bert.pooler', model.bert.pooler))
+        layers_count -= 1
+    if layers_count > 0:
+        total_encoder_layers = len(model.bert.encoder.layer)
+        encoder_layers_to_add = min(
+            layers_count, total_encoder_layers)
+        start_index = total_encoder_layers - encoder_layers_to_add
+        layers.extend([
+            (f'bert.encoder.layer.{i}', layer)
+            for i, layer in enumerate(model.bert.encoder.layer[-encoder_layers_to_add:], start=start_index)
+        ])
+    trainable_params = 0
+    # Set requires_grad to False for all layers except the last ones
+    for param in model.parameters():
+        param.requires_grad = False
+    for _, layer in layers:
+        for param in layer.parameters():
+            param.requires_grad = True
+            trainable_params += param.numel()
+
+    total_params = sum(p.numel() for p in model.parameters())
+    return total_params, trainable_params
+
 
 
 def _get_spark_session():

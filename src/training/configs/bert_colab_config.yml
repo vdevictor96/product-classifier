@@ -1,0 +1,13 @@
+input_data_path: 'data/preprocessed/amz_products_small_bert_tiny_encoded_v2.parquet'
+input_data_encoded: True
+bert_model_name: 'bert-base-uncased'
+data_load: 'static'
+trainable_layers: 3
+num_epochs: 3
+batch_size: 32
+test_batch_size: 32
+learning_rate: 1e-5
+optimizer: 'AdamW'
+device: 'cuda'
+seed: 42
+data_fraction: 1.0

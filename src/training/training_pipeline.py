@@ -1,6 +1,8 @@
+from collections import defaultdict
+
 import datetime
 from pprint import pformat
-
+import pandas as pd
 import numpy as np
 import mlflow
 import fire
@@ -13,17 +15,18 @@ from torch.utils.data import DataLoader
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 from pyspark.sql import DataFrame
 from sklearn.preprocessing import LabelEncoder
+from sklearn.model_selection import train_test_split
 from sklearn.metrics import f1_score, precision_score, recall_score, accuracy_score, confusion_matrix
 from src.training.constants import CATEGORIES
 from src.training import utils
 from src.training.settings import SETTINGS
-from src.training.datasets.product_dataset import ProductDataset
+from src.training.datasets.product_dataset import ProductIterableDataset, ProductDataset
 
 
 logger = utils.get_logger(__name__)
 
 
-def create_datasets(df: DataFrame, label_encoder: LabelEncoder, tokenizer: AutoTokenizer, max_length=512, seed=42) -> tuple[ProductDataset, ProductDataset, ProductDataset]:
+def create_datasets(df: DataFrame, label_encoder: LabelEncoder, tokenizer: AutoTokenizer, encoded: bool, max_length=512, seed=42) -> tuple[ProductIterableDataset, ProductIterableDataset, ProductIterableDataset]:
     """
     Divides the data into train, validation, and test and creates PyTorch Datasets.
 
@@ -31,11 +34,12 @@ def create_datasets(df: DataFrame, label_encoder: LabelEncoder, tokenizer: AutoT
         df (DataFrame): DataFrame containing the preprocessed data.
         label_encoder (LabelEncoder): Encoder for the labels.
         tokenizer (AutoTokenizer): BERT tokenizer.
+        encoded (bool): Whether the data is already encoded.
         max_length (int): Maximum length of the input sequence for BERT Tokenizer. Defaults to 512.
         seed (int): Random seed for reproducibility. Defaults to 42.
 
     Returns:
-        tuple[ProductDataset, ProductDataset, ProductDataset]: Train, validation, and test datasets.
+        tuple[ProductIterableDataset, ProductIterableDataset, ProductIterableDataset]: Train, validation, and test datasets.
     """
 
     # Create a Spark DataFrame for each data split
@@ -43,23 +47,53 @@ def create_datasets(df: DataFrame, label_encoder: LabelEncoder, tokenizer: AutoT
     train_df, val_df = train_df.randomSplit([0.8, 0.2], seed=seed)
 
     # Create datasets
-    train_dataset = ProductDataset(
-        train_df, label_encoder, tokenizer, max_length)
-    val_dataset = ProductDataset(val_df, label_encoder, tokenizer, max_length)
-    test_dataset = ProductDataset(
-        test_df, label_encoder, tokenizer, max_length)
+    train_dataset = ProductIterableDataset(
+        train_df, label_encoder, tokenizer, encoded, max_length)
+    val_dataset = ProductIterableDataset(
+        val_df, label_encoder, tokenizer, encoded, max_length)
+    test_dataset = ProductIterableDataset(
+        test_df, label_encoder, tokenizer, encoded, max_length)
 
     return train_dataset, val_dataset, test_dataset
 
 
-def create_loaders(train_dataset: ProductDataset, val_dataset: ProductDataset, test_dataset: ProductDataset, batch_size: int, test_batch_size: int) -> tuple[DataLoader, DataLoader, DataLoader]:
+def create_static_datasets(df: pd.DataFrame, label_encoder: LabelEncoder, tokenizer: AutoTokenizer, encoded: bool, max_length=512, seed=42) -> tuple[ProductDataset, ProductDataset, ProductDataset]:
+    """
+    Divides the data into train, validation, and test and creates PyTorch Datasets.
+
+    Args:
+        df (pd.DataFrame): DataFrame containing the preprocessed data.
+        label_encoder (LabelEncoder): Encoder for the labels.
+        tokenizer (AutoTokenizer): BERT tokenizer.
+        encoded (bool): Whether the data is already encoded.
+        max_length (int): Maximum length of the input sequence for BERT Tokenizer. Defaults to 512.
+        seed (int): Random seed for reproducibility. Defaults to 42.
+
+    Returns:
+        tuple[ProductDataset, ProductDataset, ProductDataset]: Train, validation, and test datasets.
+    """
+    train_df, test_df = train_test_split(df, test_size=0.2, random_state=seed)
+    train_df, val_df = train_test_split(
+        train_df, test_size=0.2, random_state=seed)
+
+    train_dataset = ProductDataset(
+        train_df, label_encoder, tokenizer, encoded, max_length)
+    val_dataset = ProductDataset(
+        val_df, label_encoder, tokenizer, encoded, max_length)
+    test_dataset = ProductDataset(
+        test_df, label_encoder, tokenizer, encoded, max_length)
+
+    return train_dataset, val_dataset, test_dataset
+
+
+def create_loaders(train_dataset: ProductIterableDataset, val_dataset: ProductIterableDataset, test_dataset: ProductIterableDataset, batch_size: int, test_batch_size: int) -> tuple[DataLoader, DataLoader, DataLoader]:
     """
     Creates DataLoaders for training, validation, and testing.
 
     Args:
-        train_dataset (ProductDataset): Training dataset.
-        val_dataset (ProductDataset): Validation dataset.
-        test_dataset (ProductDataset): Test dataset.
+        train_dataset (ProductIterableDataset): Training dataset.
+        val_dataset (ProductIterableDataset): Validation dataset.
+        test_dataset (ProductIterableDataset): Test dataset.
         batch_size (int): Batch size for training and validation.
         test_batch_size (int): Batch size for testing.
 
@@ -77,6 +111,37 @@ def create_loaders(train_dataset: ProductDataset, val_dataset: ProductDataset, t
         logger.info("Train loader size: %d.", train_loader_len)
         logger.info("Val loader size: %d.", val_loader_len)
         logger.info("Test loader size: %d.", test_loader_len)
+        return train_loader, val_loader, test_loader
+    except Exception as e:
+        logger.error("Failed to create DataLoaders: %s", e, exc_info=True)
+        raise
+
+
+def create_static_loaders(train_dataset: ProductDataset, val_dataset: ProductDataset, test_dataset: ProductDataset, batch_size: int, test_batch_size: int) -> tuple[DataLoader, DataLoader, DataLoader]:
+    """
+    Creates DataLoaders for training, validation, and testing.
+
+    Args:
+        train_dataset (ProductDataset): Training dataset.
+        val_dataset (ProductDataset): Validation dataset.
+        test_dataset (ProductDataset): Test dataset.
+        batch_size (int): Batch size for training and validation.
+        test_batch_size (int): Batch size for testing.
+
+    Returns:
+        tuple[DataLoader, DataLoader, DataLoader]: Train, validation, and test DataLoaders.
+    """
+    try:
+        train_loader = DataLoader(
+            train_dataset, batch_size=batch_size, shuffle=True)
+        val_loader = DataLoader(
+            val_dataset, batch_size=batch_size, shuffle=False)
+        test_loader = DataLoader(
+            test_dataset, batch_size=test_batch_size, shuffle=False)
+
+        logger.info("Train loader size: %d.", len(train_loader))
+        logger.info("Val loader size: %d.", len(val_loader))
+        logger.info("Test loader size: %d.", len(test_loader))
         return train_loader, val_loader, test_loader
     except Exception as e:
         logger.error("Failed to create DataLoaders: %s", e, exc_info=True)
@@ -132,6 +197,8 @@ def train(loader: DataLoader, model: AutoModelForSequenceClassification, optimiz
     model.train()
     total_loss = 0
     total_train_acc = 0.0
+    # Dictionary to count occurrences of each label
+    label_counter = defaultdict(int)
     for i, batch in enumerate(loader):
         optimizer.zero_grad()
         input_ids, attention_mask, labels = batch
@@ -151,10 +218,14 @@ def train(loader: DataLoader, model: AutoModelForSequenceClassification, optimiz
         total_train_acc += accuracy_score(
             label_ids, logits.argmax(axis=1))
 
-        step_loss = total_loss / (i+1)
-        step_acc = total_train_acc / (i+1)
+        # Update label counts
+        unique, counts = np.unique(label_ids, return_counts=True)
+        for label, count in zip(unique, counts):
+            label_counter[label] += count
 
         if (i+1) % 100 == 0:
+            step_loss = total_loss / i
+            step_acc = total_train_acc / i
             logger.info(
                 'Epoch %d/%d, Step %d/%d, Loss: %.4f, Accuracy: %.2f%%',
                 epoch+1, num_epochs, i, loader_len, step_loss, step_acc * 100)
@@ -289,7 +360,10 @@ def run(config='src/training/configs/default_config.yml', **overrides):
     Args:
         config (str): Path to the configuration file. Defaults to 'src/training/default_config.yml'.
             input_data_path (str): Path to the input JSONL.gz file.
+            input_data_encoded (bool): Whether the data is already encoded. Defaults to False.
             bert_model_name (str): Name of the BERT model to use for tokenization. Defaults to 'bert-base-uncased'.
+            data_load ('static' | 'distributed'): Method to load the data. Defaults to 'distributed'.
+            trainable_layers (int | None): Number of layers to keep trainable. None for all layers. Defaults to None.
             num_epochs (int): Number of epochs to train the model. Defaults to 3.
             batch_size (int): Batch size for training and validation. Defaults to 8.
             test_batch_size (int): Batch size for testing. Defaults to 32.
@@ -307,14 +381,15 @@ def run(config='src/training/configs/default_config.yml', **overrides):
         logger.info("Setting up MLflow experiment.")
         mlflow.set_experiment(SETTINGS["MLFLOW_EXPERIMENT_NAME"])
 
-        logger.info("Starting training pipeline with configuration:")
         config = utils.load_config(config)
         config.update(overrides)
-        logger.info("\n%s", pformat(config))
 
         input_data_path = config.get(
             "input_data_path", "data/preprocessed/amz_products_small_preprocessed_v1.parquet")
         bert_model_name = config.get("bert_model_name", "bert-base-uncased")
+        data_load = config.get("data_load", "distributed")
+        input_data_encoded = config.get("input_data_encoded", False)
+        trainable_layers = config.get("trainable_layers", None)
         num_epochs = config.get("num_epochs", 3)
         batch_size = config.get("batch_size", 8)
         test_batch_size = config.get("test_batch_size", 32)
@@ -337,9 +412,11 @@ def run(config='src/training/configs/default_config.yml', **overrides):
         current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
 
         with mlflow.start_run(run_name=f"Run {current_time}"):
-            mlflow.log_params({
+            params = {
                 "input_data_path": input_data_path,
                 "bert_model_name": bert_model_name,
+                "data_load": data_load,
+                "input_data_encoded": str(input_data_encoded),
                 "num_epochs": num_epochs,
                 "batch_size": batch_size,
                 "test_batch_size": test_batch_size,
@@ -348,18 +425,10 @@ def run(config='src/training/configs/default_config.yml', **overrides):
                 "seed": seed,
                 "device": str(device),
                 "data_fraction": data_fraction
-            })
-
-            logger.info("Extracting preprocessed data from file.")
-            df = utils.read_parquet_to_pyspark(input_data_path)
-            data_size = df.count()
-            logger.info("Data extracted with size: %d rows", data_size)
-
-            if data_fraction < 1.0:
-                logger.info("Sampling data with fraction: %f.", data_fraction)
-                df = df.sample(fraction=data_fraction, seed=seed)
-                data_size = df.count()
-                logger.info("Data sampled with size: %d rows", data_size)
+            }
+            mlflow.log_params(params)
+            logger.info("Starting run with configuration:")
+            logger.info("\n%s", pformat(params))
 
             # Encode categories
             label_encoder = LabelEncoder()
@@ -375,22 +444,72 @@ def run(config='src/training/configs/default_config.yml', **overrides):
             model = AutoModelForSequenceClassification.from_pretrained(
                 bert_model_name, num_labels=len(CATEGORIES))
 
-            logger.info("Creating training and validation datasets.")
-            train_dataset, val_dataset, test_dataset = create_datasets(
-                df, label_encoder, tokenizer, 512, seed=seed)
-
-            logger.info(
-                "Creating the train and validation dataloaders with batch size: %d.", batch_size)
-            logger.info(
-                "Creating the test dataloader with batch size: %d.", test_batch_size)
-            # Create the dataloaders
-            train_loader, val_loader, test_loader = create_loaders(
-                train_dataset, val_dataset, test_dataset, batch_size, test_batch_size)
-
+            if trainable_layers is not None and trainable_layers != 'None':
+                trainable_layers = int(trainable_layers)
+                logger.info(
+                    "Freezing all layers except the last %d layers.", trainable_layers)
+                total_params, trainable_params = utils.freeze_layers(
+                    model, trainable_layers)
+                logger.info("Total model parameters: %d.", total_params)
+                logger.info("Total trainable parameters: %d.",
+                            trainable_params)
             # Create the optimizer
-            optimizer = AdamW(model.parameters(), lr=learning_rate)
+            optimizer = AdamW(model.parameters(), lr=learning_rate,  eps=1e-8)
 
             model.to(device)
+
+            # Load the data
+            if data_load == 'distributed':
+                logger.info(
+                    "Extracting preprocessed data from file to a distributed PySpark DataFrame.")
+
+                df = utils.read_parquet_to_pyspark(input_data_path)
+                data_size = df.count()
+                logger.info("Data extracted with size: %d rows", data_size)
+
+                if data_fraction < 1.0:
+                    logger.info("Sampling data with fraction: %f.",
+                                data_fraction)
+                    df = df.sample(fraction=data_fraction, seed=seed)
+                    data_size = df.count()
+                    logger.info("Data sampled with size: %d rows", data_size)
+
+                logger.info("Creating training and validation datasets.")
+                train_dataset, val_dataset, test_dataset = create_datasets(
+                    df, label_encoder, tokenizer, input_data_encoded, 512, seed=seed)
+
+                logger.info(
+                    "Creating the train and validation dataloaders with batch size: %d.", batch_size)
+                logger.info(
+                    "Creating the test dataloader with batch size: %d.", test_batch_size)
+                # Create the dataloaders
+                train_loader, val_loader, test_loader = create_loaders(
+                    train_dataset, val_dataset, test_dataset, batch_size, test_batch_size)
+            else:
+                logger.info(
+                    "Extracting preprocessed data from file to a static Pandas DataFrame.")
+                df = utils.read_parquet_to_pandas(input_data_path)
+                data_size = len(df)
+                logger.info("Data extracted with size: %d rows", data_size)
+
+                if data_fraction < 1.0:
+                    logger.info("Sampling data with fraction: %f.",
+                                data_fraction)
+                    df = df.sample(frac=data_fraction, random_state=seed)
+                    data_size = len(df)
+                    logger.info("Data sampled with size: %d rows", data_size)
+
+                logger.info("Creating training and validation datasets.")
+                train_dataset, val_dataset, test_dataset = create_static_datasets(
+                    df, label_encoder, tokenizer, input_data_encoded, 512, seed=seed)
+
+                logger.info(
+                    "Creating the train and validation dataloaders with batch size: %d.", batch_size)
+                logger.info(
+                    "Creating the test dataloader with batch size: %d.", test_batch_size)
+                # Create the dataloaders
+                train_loader, val_loader, test_loader = create_static_loaders(
+                    train_dataset, val_dataset, test_dataset, batch_size, test_batch_size)
 
             logger.info("Training the model.")
 

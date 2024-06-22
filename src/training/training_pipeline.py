@@ -53,7 +53,7 @@ def create_datasets(df: DataFrame, label_encoder: LabelEncoder, tokenizer: AutoT
     train_df = train_df.orderBy(rand(seed=seed))
     val_df = val_df.orderBy(rand(seed=seed))
     test_df = test_df.orderBy(rand(seed=seed))
-    
+
     train_dataset = ProductIterableDataset(
         train_df, label_encoder, tokenizer, encoded, max_length)
     val_dataset = ProductIterableDataset(
@@ -466,9 +466,6 @@ def run(config='src/training/configs/default_config.yml', **overrides):
                             trainable_params)
             # Create the optimizer
             optimizer = AdamW(model.parameters(), lr=learning_rate,  eps=1e-8)
-            
-            
-            
 
             # Load the data
             if data_load == 'distributed':
@@ -529,7 +526,7 @@ def run(config='src/training/configs/default_config.yml', **overrides):
             warmup_steps = int(0.1 * total_steps)
             scheduler = get_linear_schedule_with_warmup(
                 optimizer, num_warmup_steps=warmup_steps, num_training_steps=total_steps)
-            
+
             logger.info("Training the model.")
 
             best_model_state = model.state_dict()
@@ -541,8 +538,9 @@ def run(config='src/training/configs/default_config.yml', **overrides):
                     # Shuffle the data after the first epoch if using IterableDataset
                     if (data_load == 'distributed' and epoch > 0):
                         train_loader.dataset.reshuffle(seed=seed)
-                        train_loader = DataLoader(train_loader.dataset, batch_size=batch_size)
-            
+                        train_loader = DataLoader(
+                            train_loader.dataset, batch_size=batch_size)
+
                     train(train_loader, model, optimizer, scheduler,
                           device, epoch, num_epochs)
                     # Validation after each epoch

@@ -19,7 +19,6 @@ def get_logger(name: str) -> logging.Logger:
     return logger
 
 
-
 def preprocess_data(data: ProductDescription) -> str:
     """ 
     Preprocesses the input data for the model.
@@ -30,6 +29,6 @@ def preprocess_data(data: ProductDescription) -> str:
     Returns:
         str: The preprocessed text data.
     """
-    combined_text = "| ".join(
-        [data.title] + data.description + data.feature + [data.brand])
+    combined_text = " | ".join([data.asin] +
+                              [data.title] + data.description + data.feature + [data.brand])
     return combined_text

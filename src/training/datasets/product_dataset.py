@@ -6,6 +6,7 @@ from torch.utils.data import IterableDataset, Dataset
 from transformers import AutoTokenizer
 import pandas as pd
 from pyspark.sql import DataFrame
+from pyspark.sql.functions import rand
 from sklearn.preprocessing import LabelEncoder
 from src.training import utils
 
@@ -40,6 +41,10 @@ class ProductIterableDataset(IterableDataset):
         self.tokenizer = tokenizer
         self.encoded = encoded
         self.max_length = max_length
+
+    def reshuffle(self, seed=42):
+        """Reshuffles the DataFrame."""
+        self.df = self.df.orderBy(rand(seed=seed))
 
     def process_row(self, row) -> tuple[Tensor, Tensor, Tensor]:
         """

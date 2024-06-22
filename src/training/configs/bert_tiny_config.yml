@@ -1,6 +1,6 @@
 input_data_path: 'data/preprocessed/amz_products_small_preprocessed_v1.parquet'
 input_data_encoded: False
-data_load: 'static'
+data_load: 'memory'
 trainable_layers: None
 bert_model_name: "prajjwal1/bert-tiny"
 num_epochs: 1

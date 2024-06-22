@@ -1,8 +1,8 @@
 input_data_path: 'data/preprocessed/amz_products_small_bert_tiny_encoded_v2.parquet'
 input_data_encoded: True
-bert_model_name: 'bert-base-uncased'
-data_load: 'static'
+data_load: 'memory'
 trainable_layers: 3
+bert_model_name: "prajjwal1/bert-tiny"
 num_epochs: 3
 batch_size: 32
 test_batch_size: 32

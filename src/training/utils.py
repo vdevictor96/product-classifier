@@ -12,8 +12,6 @@ import pandas as pd
 from pyspark.sql import SparkSession, DataFrame
 
 
-
-
 def get_logger(name: str) -> logging.Logger:
     """
     Template for getting a logger.
@@ -29,7 +27,9 @@ def get_logger(name: str) -> logging.Logger:
 
     return logger_instance
 
+
 logger = get_logger(__name__)
+
 
 def read_jsonl_to_pandas(path: str) -> pd.DataFrame:
     """
@@ -52,17 +52,20 @@ def read_jsonl_to_pandas(path: str) -> pd.DataFrame:
         raise
 
 
-def read_parquet_to_pandas(path: str) -> pd.DataFrame:
+def read_parquet_to_pandas(path: str, use_pyspark=False) -> pd.DataFrame:
     """
     Reads a Parquet file into a Pandas DataFrame.
 
     Args:
         path (str): The path to the Parquet file.
+        use_pyspark (bool): Whether to use PySpark to read the Parquet file. Defaults to False.
 
     Returns:
         pd.DataFrame: A Pandas DataFrame containing the data from the Parquet file.
     """
     try:
+        if use_pyspark:
+            return read_parquet_to_pyspark(path).toPandas()
         return pd.read_parquet(path)
     except Exception as e:
         logger.error(
@@ -137,15 +140,14 @@ def load_config(config_path: str) -> dict:
         raise
 
 
-
 def freeze_layers(model, layers_count):
     """
     Freezes all layers except the last layers_count layers.
-    
+
     Args:
         model: PyTorch model.
         layers_count: Number of layers to keep trainable.
-    
+
     Returns:
         int: The number of trainable parameters.
         list: List of layers that are trainable.
@@ -178,7 +180,6 @@ def freeze_layers(model, layers_count):
 
     total_params = sum(p.numel() for p in model.parameters())
     return total_params, trainable_params
-
 
 
 def _get_spark_session():

@@ -15,6 +15,8 @@ COPY src/training/environment.yml /usr/app/src/training/
 # Install dependencies from conda environment file
 RUN conda env create -f environment.yml --name training
 
+ARG DATABRICKS_PASSWORD
+
 # Create Databricks authentication file
 RUN echo "[DEFAULT]" > ~/.databrickscfg && \
     echo "host = https://community.cloud.databricks.com/" >> ~/.databrickscfg && \
@@ -33,7 +35,6 @@ COPY data/preprocessed/ /usr/app/data/preprocessed/
 # Copy the rest of the code
 COPY src/training/ /usr/app/src/training/
 
-ARG DATABRICKS_PASSWORD
 ENV NVIDIA_VISIBLE_DEVICES=all
 ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
 

@@ -11,9 +11,12 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from tqdm import tqdm
 from torch.optim import AdamW
+from torch.optim.lr_scheduler import LambdaLR
 from torch.utils.data import DataLoader
-from transformers import AutoModelForSequenceClassification, AutoTokenizer
+from transformers import AutoModelForSequenceClassification, AutoTokenizer, get_linear_schedule_with_warmup
 from pyspark.sql import DataFrame
+from pyspark.sql.functions import rand
+
 from sklearn.preprocessing import LabelEncoder
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import f1_score, precision_score, recall_score, accuracy_score, confusion_matrix
@@ -46,7 +49,11 @@ def create_datasets(df: DataFrame, label_encoder: LabelEncoder, tokenizer: AutoT
     train_df, test_df = df.randomSplit([0.8, 0.2], seed=seed)
     train_df, val_df = train_df.randomSplit([0.8, 0.2], seed=seed)
 
-    # Create datasets
+    # Shuffle the data for better training
+    train_df = train_df.orderBy(rand(seed=seed))
+    val_df = val_df.orderBy(rand(seed=seed))
+    test_df = test_df.orderBy(rand(seed=seed))
+    
     train_dataset = ProductIterableDataset(
         train_df, label_encoder, tokenizer, encoded, max_length)
     val_dataset = ProductIterableDataset(
@@ -57,7 +64,7 @@ def create_datasets(df: DataFrame, label_encoder: LabelEncoder, tokenizer: AutoT
     return train_dataset, val_dataset, test_dataset
 
 
-def create_static_datasets(df: pd.DataFrame, label_encoder: LabelEncoder, tokenizer: AutoTokenizer, encoded: bool, max_length=512, seed=42) -> tuple[ProductDataset, ProductDataset, ProductDataset]:
+def create_in_memory_datasets(df: pd.DataFrame, label_encoder: LabelEncoder, tokenizer: AutoTokenizer, encoded: bool, max_length=512, seed=42) -> tuple[ProductDataset, ProductDataset, ProductDataset]:
     """
     Divides the data into train, validation, and test and creates PyTorch Datasets.
 
@@ -117,7 +124,7 @@ def create_loaders(train_dataset: ProductIterableDataset, val_dataset: ProductIt
         raise
 
 
-def create_static_loaders(train_dataset: ProductDataset, val_dataset: ProductDataset, test_dataset: ProductDataset, batch_size: int, test_batch_size: int) -> tuple[DataLoader, DataLoader, DataLoader]:
+def create_in_memory_loaders(train_dataset: ProductDataset, val_dataset: ProductDataset, test_dataset: ProductDataset, batch_size: int, test_batch_size: int) -> tuple[DataLoader, DataLoader, DataLoader]:
     """
     Creates DataLoaders for training, validation, and testing.
 
@@ -180,7 +187,7 @@ def plot_confusion_matrix(cm: np.ndarray, labels: list[str], log: bool = True):
         raise
 
 
-def train(loader: DataLoader, model: AutoModelForSequenceClassification, optimizer: AdamW, device: str, epoch: int, num_epochs: int):
+def train(loader: DataLoader, model: AutoModelForSequenceClassification, optimizer: AdamW, scheduler: LambdaLR, device: str, epoch: int, num_epochs: int):
     """
     Trains the model for one epoch.
 
@@ -188,6 +195,7 @@ def train(loader: DataLoader, model: AutoModelForSequenceClassification, optimiz
         loader (DataLoader): PyTorch DataLoader for training data.
         model (AutoModelForSequenceClassification): BERT model for text classification.
         optimizer (AdamW): Optimizer for training.
+        scheduler (LambdaLR): Learning rate scheduler.
         device (str): Device to use for training.
         epoch (int): Current epoch number.
         num_epochs (int): Total number of epochs.
@@ -211,19 +219,18 @@ def train(loader: DataLoader, model: AutoModelForSequenceClassification, optimiz
         total_loss += loss.item()
         loss.backward()
         optimizer.step()
-
+        scheduler.step()
         logits = outputs.logits
         logits = logits.detach().cpu().numpy()
         label_ids = labels.to('cpu').numpy()
-        total_train_acc += accuracy_score(
-            label_ids, logits.argmax(axis=1))
-
+        batch_acc = accuracy_score(label_ids, logits.argmax(axis=1))
+        total_train_acc += batch_acc
         # Update label counts
         unique, counts = np.unique(label_ids, return_counts=True)
         for label, count in zip(unique, counts):
             label_counter[label] += count
 
-        if (i+1) % 100 == 0:
+        if (i+1) % 100 == 0 or (i+1) == loader_len:
             step_loss = total_loss / i
             step_acc = total_train_acc / i
             logger.info(
@@ -362,7 +369,7 @@ def run(config='src/training/configs/default_config.yml', **overrides):
             input_data_path (str): Path to the input JSONL.gz file.
             input_data_encoded (bool): Whether the data is already encoded. Defaults to False.
             bert_model_name (str): Name of the BERT model to use for tokenization. Defaults to 'bert-base-uncased'.
-            data_load ('static' | 'distributed'): Method to load the data. Defaults to 'distributed'.
+            data_load ('memory' | 'distributed'): Method to load the data. Defaults to 'distributed'.
             trainable_layers (int | None): Number of layers to keep trainable. None for all layers. Defaults to None.
             num_epochs (int): Number of epochs to train the model. Defaults to 3.
             batch_size (int): Batch size for training and validation. Defaults to 8.
@@ -417,6 +424,7 @@ def run(config='src/training/configs/default_config.yml', **overrides):
                 "bert_model_name": bert_model_name,
                 "data_load": data_load,
                 "input_data_encoded": str(input_data_encoded),
+                "trainable_layers": trainable_layers,
                 "num_epochs": num_epochs,
                 "batch_size": batch_size,
                 "test_batch_size": test_batch_size,
@@ -444,6 +452,9 @@ def run(config='src/training/configs/default_config.yml', **overrides):
             model = AutoModelForSequenceClassification.from_pretrained(
                 bert_model_name, num_labels=len(CATEGORIES))
 
+            model.to(device)
+
+            # Freeze all layers except the last trainable_layers
             if trainable_layers is not None and trainable_layers != 'None':
                 trainable_layers = int(trainable_layers)
                 logger.info(
@@ -455,8 +466,9 @@ def run(config='src/training/configs/default_config.yml', **overrides):
                             trainable_params)
             # Create the optimizer
             optimizer = AdamW(model.parameters(), lr=learning_rate,  eps=1e-8)
-
-            model.to(device)
+            
+            
+            
 
             # Load the data
             if data_load == 'distributed':
@@ -487,7 +499,7 @@ def run(config='src/training/configs/default_config.yml', **overrides):
                     train_dataset, val_dataset, test_dataset, batch_size, test_batch_size)
             else:
                 logger.info(
-                    "Extracting preprocessed data from file to a static Pandas DataFrame.")
+                    "Extracting preprocessed data from file to an in memory Pandas DataFrame.")
                 df = utils.read_parquet_to_pandas(input_data_path)
                 data_size = len(df)
                 logger.info("Data extracted with size: %d rows", data_size)
@@ -500,7 +512,7 @@ def run(config='src/training/configs/default_config.yml', **overrides):
                     logger.info("Data sampled with size: %d rows", data_size)
 
                 logger.info("Creating training and validation datasets.")
-                train_dataset, val_dataset, test_dataset = create_static_datasets(
+                train_dataset, val_dataset, test_dataset = create_in_memory_datasets(
                     df, label_encoder, tokenizer, input_data_encoded, 512, seed=seed)
 
                 logger.info(
@@ -508,9 +520,16 @@ def run(config='src/training/configs/default_config.yml', **overrides):
                 logger.info(
                     "Creating the test dataloader with batch size: %d.", test_batch_size)
                 # Create the dataloaders
-                train_loader, val_loader, test_loader = create_static_loaders(
+                train_loader, val_loader, test_loader = create_in_memory_loaders(
                     train_dataset, val_dataset, test_dataset, batch_size, test_batch_size)
 
+            # Create the learning rate scheduler
+            total_steps = len(train_loader) * num_epochs
+            # Set the warmup steps to 10% of the total steps
+            warmup_steps = int(0.1 * total_steps)
+            scheduler = get_linear_schedule_with_warmup(
+                optimizer, num_warmup_steps=warmup_steps, num_training_steps=total_steps)
+            
             logger.info("Training the model.")
 
             best_model_state = model.state_dict()
@@ -519,7 +538,12 @@ def run(config='src/training/configs/default_config.yml', **overrides):
                 # Training loop
                 for epoch in range(num_epochs):
                     # Train one epoch
-                    train(train_loader, model, optimizer,
+                    # Shuffle the data after the first epoch if using IterableDataset
+                    if (data_load == 'distributed' and epoch > 0):
+                        train_loader.dataset.reshuffle(seed=seed)
+                        train_loader = DataLoader(train_loader.dataset, batch_size=batch_size)
+            
+                    train(train_loader, model, optimizer, scheduler,
                           device, epoch, num_epochs)
                     # Validation after each epoch
                     eval_loss, eval_acc = evaluate(

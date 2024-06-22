@@ -22,9 +22,7 @@ SHELL ["conda", "run", "-n", "inference", "/bin/bash", "-c"]
 COPY src/inference/ /usr/app/src/inference/
 
 # Expose port 8000 for the application
-
 EXPOSE 8000
-
 
 WORKDIR /usr/app/
 

@@ -1,7 +1,6 @@
 # Product Classification
 
-In this test we ask you to build a model to classify products into their categories according to their features.
-
+End to end implementation of a BERT based model classifier for Amazon products. Integrated with MLFlow tracking. Dockerized and ready to run.
 
 
 ## Index
